@@ -1,32 +1,53 @@
-import { Client, CommitmentLevel } from "@triton-one/yellowstone-grpc";
+require('dotenv').config();
+const grpc = require('@grpc/grpc-js');
+const protoLoader = require('@grpc/proto-loader');
+const path = require('path');
 
-const GRPC_URL = "https://grpc.ny.shyft.to";
-const X_TOKEN = "36e2e19a-83fd-41d5-b883-cd248454b0b6";
-const TARGET_WALLET = "8nXhCbajhPi5QvgKdp7yLSiUjvKGBJ8E87xYZLsD7y3D";
+// Load environment variables
+const { GRPC_ENDPOINT, X_TOKEN, WALLET_ADDRESS } = process.env;
 
-const client = new Client(GRPC_URL, X_TOKEN, undefined);
+// Load the protobuf
+const PROTO_PATH = path.resolve(__dirname, 'proto/solana.proto');
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
+const solanaProto = grpc.loadPackageDefinition(packageDefinition).solana.rpc;
 
-async function subscribeToTransactions() {
-    try {
-        console.log(`Listening for transactions involving: ${TARGET_WALLET}`);
+// Create a new client instance
+const client = new solanaProto.Solana(
+  GRPC_ENDPOINT,
+  grpc.credentials.createSsl()
+);
 
-        const subscription = await client.transactionSubscribe({
-            commitment: CommitmentLevel.Confirmed,
-            filter: {
-                accountInclude: [TARGET_WALLET]
-            }
-        });
+// Set up metadata with x-token
+const metadata = new grpc.Metadata();
+metadata.add('x-token', X_TOKEN);
 
-        subscription.on("data", (txn) => {
-            console.log("New transaction detected:", txn);
-        });
+// Create the subscription request
+const request = {
+  transactions: {
+    vote: false,
+    failed: false,
+    account_include: [WALLET_ADDRESS],
+  },
+  commitment: 'CONFIRMED',
+};
 
-        subscription.on("error", (error) => {
-            console.error("Subscription error:", error);
-        });
-    } catch (error) {
-        console.error("Error subscribing to transactions:", error);
-    }
-}
+// Subscribe to the stream
+const call = client.Subscribe(request, metadata);
 
-subscribeToTransactions();
+call.on('data', (response) => {
+  console.log('Transaction update:', response);
+});
+
+call.on('error', (error) => {
+  console.error('Error in gRPC stream:', error);
+});
+
+call.on('end', () => {
+  console.log('Stream ended');
+});
