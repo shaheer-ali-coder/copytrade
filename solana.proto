@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package solana.rpc;
+
+service Solana {
+  rpc Subscribe (SubscribeRequest) returns (stream SubscribeResponse) {}
+}
+
+message SubscribeRequest {
+  TransactionsFilter transactions = 1;
+  CommitmentLevel commitment = 2;
+}
+
+message TransactionsFilter {
+  string vote = 1;
+  string failed = 2;
+  repeated string account_include = 3;
+}
+
+enum CommitmentLevel {
+  PROCESSED = 0;
+  CONFIRMED = 1;
+  FINALIZED = 2;
+}
+
+message SubscribeResponse {
+  oneof message {
+    SlotUpdate slot = 1;
+    AccountUpdate account = 2;
+    TransactionUpdate transaction = 3;
+    BlockUpdate block = 4;
+    EntryUpdate entry = 5;
+    PingResponse ping = 6;
+  }
+}
+
+message SlotUpdate {
+  uint64 slot = 1;
+  // Additional fields as required
+}
+
+message AccountUpdate {
+  string account = 1;
+  bytes data = 2;
+  // Additional fields as required
+}
+
+message TransactionUpdate {
+  string signature = 1;
+  bytes transaction = 2;
+  // Additional fields as required
+}
+
+message BlockUpdate {
+  uint64 block_height = 1;
+  // Additional fields as required
+}
+
+message EntryUpdate {
+  uint64 entry_id = 1;
+  // Additional fields as required
+}
+
+message PingResponse {
+  string timestamp = 1;
+  // Additional fields as required
+}
+
